@@ -15,6 +15,13 @@
       "when": 1753196007340,
       "tag": "0001_chief_emma_frost",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753219950555,
+      "tag": "0002_melodic_guardsmen",
+      "breakpoints": true
     }
   ]
 }
