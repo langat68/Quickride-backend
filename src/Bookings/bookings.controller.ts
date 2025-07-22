@@ -27,6 +27,8 @@ export class BookingController {
 
     const newBooking = await this.service.createBooking({
       ...body,
+      pickupDate: start,       // ✅ Ensure JS Date
+      returnDate: end,         // ✅ Ensure JS Date
       totalAmount,
       bookingReference,
     });
@@ -49,6 +51,11 @@ export class BookingController {
   update = async (c: Context) => {
     const id = Number(c.req.param('id'));
     const body = await c.req.json();
+
+    // Optional: Convert dates if updating
+    if (body.pickupDate) body.pickupDate = new Date(body.pickupDate);
+    if (body.returnDate) body.returnDate = new Date(body.returnDate);
+
     const updated = await this.service.updateBooking(id, body);
     return c.json(updated);
   };

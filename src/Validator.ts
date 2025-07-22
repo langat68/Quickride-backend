@@ -89,11 +89,13 @@ export const carIdParam = z.object({
 // Booking Validators
 // =======================
 
+
+
 export const createBookingSchema = z.object({
   userId: z.coerce.number().positive(),
   carId: z.coerce.number().positive(),
-  pickupDate: z.string().datetime(),
-  returnDate: z.string().datetime(),
+  pickupDate: z.coerce.date(),         // ✅ converts ISO string → Date
+  returnDate: z.coerce.date(),         // ✅ same here
   pickupLocation: z.string().min(2),
   totalAmount: z.coerce.number().positive(),
   status: z.enum(["pending", "confirmed", "completed", "cancelled"]).optional(),
@@ -110,15 +112,16 @@ export const bookingIdParam = z.object({
 
 // Payment Validators
 // =======================
-
 export const createPaymentSchema = z.object({
   bookingId: z.coerce.number().positive(),
   amount: z.coerce.number().positive(),
   paymentMethod: z.enum(["card", "mpesa", "bank_transfer"]),
+  phoneNumber: z.string().min(10).max(15), // ✅ Required
   paymentStatus: z.enum(["pending", "completed", "failed", "refunded"]).optional(),
   transactionId: z.string().optional(),
-  paymentDate: z.coerce.date().optional(), // ✅ Converts ISO string to `Date`
+  paymentDate: z.coerce.date().optional(),
 });
+
 
 export const updatePaymentSchema = createPaymentSchema.partial();
 

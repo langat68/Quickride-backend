@@ -1,10 +1,11 @@
+
+// payments.service.ts
 import { db } from "../db/db.js";
 import { payments } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import type { NewPayment } from "../db/schema.js";
 import axios from "axios";
 
-// Utility to convert number → DB decimal string
 const toDbDecimal = (num: number, scale = 2): string => num.toFixed(scale);
 
 export const getAllPayments = async () => {
@@ -17,7 +18,6 @@ export const getPaymentById = async (id: number) => {
   });
 };
 
-// updated to accept `amount: number` and convert properly
 export const createPayment = async (
   data: Omit<NewPayment, "amount"> & { amount: number }
 ) => {
@@ -25,23 +25,23 @@ export const createPayment = async (
     .insert(payments)
     .values({
       ...data,
-      amount: toDbDecimal(data.amount), // 🔥 convert number → string
+      amount: toDbDecimal(data.amount),
     })
     .returning();
-
   return inserted;
 };
 
-// Initiate M-Pesa STK Push
 export const initiateMpesaPayment = async ({
   phone,
   amount,
+  bookingId,
   accountReference,
   transactionDesc,
   callbackUrl,
 }: {
   phone: string;
   amount: number;
+  bookingId: number;
   accountReference: string;
   transactionDesc: string;
   callbackUrl: string;
@@ -52,18 +52,15 @@ export const initiateMpesaPayment = async ({
   const passkey = process.env.MPESA_PASSKEY!;
   const baseUrl = "https://sandbox.safaricom.co.ke";
 
-  // Get access token
-  const authResponse = await axios.get(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
-    auth: { username: consumerKey, password: consumerSecret },
-  });
+  const authResponse = await axios.get(
+    `${baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
+    {
+      auth: { username: consumerKey, password: consumerSecret },
+    }
+  );
 
   const accessToken = authResponse.data.access_token;
-
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:TZ.]/g, "")
-    .slice(0, 14);
-
+  const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
   const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString("base64");
 
   const stkResponse = await axios.post(
@@ -78,7 +75,7 @@ export const initiateMpesaPayment = async ({
       PartyB: shortcode,
       PhoneNumber: phone,
       CallBackURL: callbackUrl,
-      AccountReference: accountReference,
+      AccountReference: String(bookingId),
       TransactionDesc: transactionDesc,
     },
     {
@@ -90,11 +87,9 @@ export const initiateMpesaPayment = async ({
 
   return stkResponse.data;
 };
-
-// Update payment on callback
 export const updatePaymentStatus = async (
   bookingId: number,
-  status: string,
+  status: "pending" | "completed" | "failed" | "refunded", // 🔐 explicitly typed
   transactionId?: string
 ) => {
   return db
