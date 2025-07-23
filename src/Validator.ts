@@ -128,3 +128,11 @@ export const updatePaymentSchema = createPaymentSchema.partial();
 export const paymentIdParam = z.object({
   id: z.coerce.number().positive(),
 });
+
+
+
+
+export const initiateMpesaSchema = z.object({
+  phoneNumber: z.string().min(10).max(15),
+  amount: z.coerce.number().positive(),
+});

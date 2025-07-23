@@ -15,8 +15,17 @@ import { relations } from "drizzle-orm";
 // 🔹 Enums
 //
 export const userRole = pgEnum("user_role", ["customer", "admin", "manager"]);
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "cancelled"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["pending", "completed", "failed", "refunded"]);
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "pending",
+  "confirmed",
+  "cancelled",
+]);
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "completed",
+  "failed",
+  "refunded",
+]);
 
 //
 // 🔹 Users Table
@@ -76,10 +85,22 @@ export const payments = pgTable("payments", {
   paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // mpesa, card, etc.
   phoneNumber: varchar("phone_number", { length: 15 }).notNull(), // ✅ for M-Pesa
   paymentStatus: paymentStatusEnum("payment_status").default("pending"),
-  transactionId: varchar("transaction_id", { length: 100 }),
+  transactionId: varchar("transaction_id", { length: 100 }), // M-Pesa confirmation code here
   paymentDate: timestamp("payment_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+//
+// 🔹 M-Pesa Requests Table
+//
+export const mpesaRequests = pgTable("mpesa_requests", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").references(() => bookings.id).notNull(),
+  merchantRequestId: varchar("merchant_request_id", { length: 100 }).notNull(),
+  checkoutRequestId: varchar("checkout_request_id", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).default("pending"), // pending, completed, failed
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 //
@@ -103,11 +124,19 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     references: [cars.id],
   }),
   payments: many(payments),
+  mpesaRequests: many(mpesaRequests),
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   booking: one(bookings, {
     fields: [payments.bookingId],
+    references: [bookings.id],
+  }),
+}));
+
+export const mpesaRequestsRelations = relations(mpesaRequests, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [mpesaRequests.bookingId],
     references: [bookings.id],
   }),
 }));
@@ -126,3 +155,6 @@ export type NewBooking = typeof bookings.$inferInsert;
 
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
+
+export type MpesaRequest = typeof mpesaRequests.$inferSelect;
+export type NewMpesaRequest = typeof mpesaRequests.$inferInsert;

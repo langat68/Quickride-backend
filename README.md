@@ -112,3 +112,10 @@ car
     "transactionId": "MPESA123456",
     "paymentDate": "2025-07-22T14:30:00Z"
   }
+
+  {
+  "bookingId": 1,
+  "amount": 500,
+  "paymentMethod": "mpesa",
+  "phoneNumber": "2547XXXXXXXX"
+}

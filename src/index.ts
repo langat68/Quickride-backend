@@ -9,6 +9,7 @@ import userRouter from './Users/user.route.js';
 import authRouter from './Auth/auth.route.js';
 import { carRouter } from './Cars/cars.route.js';
 import bookingRouter from './Bookings/bookings.routes.js';
+import paymentRouter from './Payments/payments.route.js';
 
 const app = new Hono();
 
@@ -20,6 +21,7 @@ app.route('/users', userRouter);
 app.route('/auth', authRouter);
 app.route ('/cars', carRouter);
 app.route('/bookings', bookingRouter);
+app.route('/payments', paymentRouter)
 
 
 // Use PORT from .env or fallback to 3000
