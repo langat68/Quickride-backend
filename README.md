@@ -119,3 +119,23 @@ car
   "paymentMethod": "mpesa",
   "phoneNumber": "2547XXXXXXXX"
 }
+
+
+
+# Database connection string
+DATABASE_URL=postgresql://neondb_owner:npg_xfBk9euG7tTq@ep-empty-unit-a8x9ep40-pooler.eastus2.azure.neon.tech/Quickride?sslmode=require&channel_binding=require
+
+# JWT secret for signing tokens
+JWT_SECRET=my_super_secret_key
+
+# M-Pesa credentials
+MPESA_CONSUMER_KEY=7u2LDK4hfErYpkz7UPBF0mHqzvyaXoXXXGWBB1UOtzuSdJ3G
+MPESA_CONSUMER_SECRET=NlX0nQ38U2hPL4Z7Ebsu4Oq5ZNoARN2PWndlCE1i3rPsG3MBvbegmZfLH9cPnOAz
+MPESA_SHORTCODE=174379
+MPESA_PASSKEY=bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+
+# ✅ Use your current ngrok forwarding URL here
+MPESA_CALLBACK_URL=https://f672db3aa218.ngrok-free.app/payments/mpesa/callback
+
+# Environment: sandbox or production
+MPESA_ENVIRONMENT=sandbox

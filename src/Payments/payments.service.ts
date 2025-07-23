@@ -1,240 +1,336 @@
-// payments.service.ts
-import { db } from "../db/db.js";
-import { payments, bookings } from "../db/schema.js";
-import { eq, desc } from "drizzle-orm";
-import type { NewPayment } from "../db/schema.js";
-import {
-  formatPhoneNumber,
-  getAccessToken,
-} from "./daraja.js";
+// services/mpesa.service.ts
+import axios from 'axios';
+import { db } from '../db/db.js'; // Adjust path to your database
+import { payments, mpesaRequests, bookings } from '../db/schema.js'; // Adjust path
+import { eq } from 'drizzle-orm';
 
-const toDbDecimal = (num: number, scale = 2): string => num.toFixed(scale);
+interface MpesaAccessTokenResponse {
+  access_token: string;
+  expires_in: string;
+}
 
-export const getAllPayments = async () => {
-  return db.select().from(payments).orderBy(desc(payments.createdAt));
-};
+interface STKPushRequest {
+  BusinessShortCode: string;
+  Password: string;
+  Timestamp: string;
+  TransactionType: string;
+  Amount: number;
+  PartyA: string;
+  PartyB: string;
+  PhoneNumber: string;
+  CallBackURL: string;
+  AccountReference: string;
+  TransactionDesc: string;
+}
 
-export const getPaymentById = async (id: number) => {
-  return db.query.payments.findFirst({ where: eq(payments.id, id) });
-};
+interface STKPushResponse {
+  MerchantRequestID: string;
+  CheckoutRequestID: string;
+  ResponseCode: string;
+  ResponseDescription: string;
+  CustomerMessage: string;
+}
 
-export const getPaymentByBookingId = async (bookingId: number) => {
-  return db.query.payments.findFirst({
-    where: eq(payments.bookingId, bookingId),
-    orderBy: desc(payments.createdAt),
-  });
-};
-
-export const getPaymentsByUserId = async (userId: number) => {
-  return db
-    .select({
-      id: payments.id,
-      bookingId: payments.bookingId,
-      amount: payments.amount,
-      paymentMethod: payments.paymentMethod,
-      phoneNumber: payments.phoneNumber,
-      paymentStatus: payments.paymentStatus,
-      transactionId: payments.transactionId,
-      paymentDate: payments.paymentDate,
-      createdAt: payments.createdAt,
-      updatedAt: payments.updatedAt,
-      bookingReference: bookings.bookingReference,
-      totalAmount: bookings.totalAmount,
-      pickupDate: bookings.pickupDate,
-      returnDate: bookings.returnDate,
-    })
-    .from(payments)
-    .innerJoin(bookings, eq(payments.bookingId, bookings.id))
-    .where(eq(bookings.userId, userId))
-    .orderBy(desc(payments.createdAt));
-};
-
-export const createPayment = async (
-  data: Omit<NewPayment, "amount"> & { amount: number }
-) => {
-  const [inserted] = await db
-    .insert(payments)
-    .values({
-      ...data,
-      amount: toDbDecimal(data.amount),
-    })
-    .returning();
-  return inserted;
-};
-
-export const initiateMpesaPayment = async ({
-  phone,
-  amount,
-  bookingId,
-  accountReference,
-  transactionDesc,
-  callbackUrl,
-}: {
-  phone: string;
-  amount: number;
-  bookingId: number;
-  accountReference: string;
-  transactionDesc: string;
-  callbackUrl: string;
-}) => {
-  const accessToken = await getAccessToken();
-  const formattedPhone = formatPhoneNumber(phone);
-
-  const shortcode = process.env.MPESA_SHORTCODE!;
-  const passkey = process.env.MPESA_PASSKEY!;
-  const baseUrl = process.env.NODE_ENV === "production"
-    ? "https://api.safaricom.co.ke"
-    : "https://sandbox.safaricom.co.ke";
-
-  const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString("base64");
-
-  const payload = {
-    BusinessShortCode: shortcode,
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType: "CustomerPayBillOnline",
-    Amount: Math.floor(Number(amount)),
-    PartyA: formattedPhone,
-    PartyB: shortcode,
-    PhoneNumber: formattedPhone,
-    CallBackURL: callbackUrl,
-    AccountReference: String(bookingId),
-    TransactionDesc: transactionDesc,
-  };
-
-  try {
-    console.log("🚀 Initiating STK Push for booking:", bookingId);
-
-    const response = await fetch(`${baseUrl}/mpesa/stkpush/v1/processrequest`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.errorCode) {
-      console.error("STK Push Error Response:", result);
-      throw new Error(result.errorMessage || result.errorDescription || "STK Push failed");
-    }
-
-    console.log("✅ STK Push Request Sent Successfully:", {
-      CheckoutRequestID: result.CheckoutRequestID,
-      MerchantRequestID: result.MerchantRequestID,
-      bookingId,
-    });
-
-    return {
-      success: true,
-      message: "STK push initiated. Awaiting user confirmation.",
-      requestId: result.CheckoutRequestID,
+interface CallbackRequest {
+  Body: {
+    stkCallback: {
+      MerchantRequestID: string;
+      CheckoutRequestID: string;
+      ResultCode: number;
+      ResultDesc: string;
+      CallbackMetadata?: {
+        Item: Array<{
+          Name: string;
+          Value: string | number;
+        }>;
+      };
     };
-  } catch (error: any) {
-    console.error("❌ STK Push Failed:", error.message || error);
-    throw new Error(`Failed to initiate M-Pesa STK Push: ${error.message}`);
-  }
-};
-
-export const updatePaymentStatus = async (
-  bookingId: number,
-  status: "pending" | "completed" | "failed" | "refunded",
-  transactionId?: string
-) => {
-  const updateData: any = {
-    paymentStatus: status,
-    updatedAt: new Date(),
   };
+}
 
-  if (transactionId) {
-    updateData.transactionId = transactionId;
+export class MpesaService {
+  private readonly consumerKey: string;
+  private readonly consumerSecret: string;
+  private readonly businessShortCode: string;
+  private readonly passkey: string;
+  private readonly callbackUrl: string;
+  private readonly baseUrl: string;
+
+  constructor() {
+    this.consumerKey = process.env.MPESA_CONSUMER_KEY!;
+    this.consumerSecret = process.env.MPESA_CONSUMER_SECRET!;
+    this.businessShortCode = process.env.MPESA_BUSINESS_SHORT_CODE!;
+    this.passkey = process.env.MPESA_PASSKEY!;
+    this.callbackUrl = process.env.MPESA_CALLBACK_URL!;
+    this.baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://api.safaricom.co.ke' 
+      : 'https://sandbox.safaricom.co.ke';
+
+    // Validate required environment variables
+    if (!this.consumerKey || !this.consumerSecret || !this.businessShortCode || !this.passkey || !this.callbackUrl) {
+      throw new Error('Missing required M-Pesa environment variables');
+    }
   }
 
-  if (status === "completed") {
-    updateData.paymentDate = new Date();
+  /**
+   * Get OAuth access token from M-Pesa API
+   */
+  private async getAccessToken(): Promise<string> {
+    try {
+      const auth = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
+      
+      const response = await axios.get<MpesaAccessTokenResponse>(
+        `${this.baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
+        {
+          headers: {
+            Authorization: `Basic ${auth}`,
+          },
+        }
+      );
+
+      return response.data.access_token;
+    } catch (error) {
+      console.error('Error getting M-Pesa access token:', error);
+      throw new Error('Failed to get M-Pesa access token');
+    }
   }
 
-  return db
-    .update(payments)
-    .set(updateData)
-    .where(eq(payments.bookingId, bookingId))
-    .returning();
-};
-
-export const processMpesaCallback = async (callbackData: any) => {
-  const stkCallback = callbackData?.Body?.stkCallback;
-  if (!stkCallback) throw new Error("Invalid callback format");
-
-  const resultCode = stkCallback.ResultCode;
-  const resultDesc = stkCallback.ResultDesc;
-  const metadata = stkCallback.CallbackMetadata;
-
-  let bookingId = 0;
-  let mpesaReceipt = "";
-  let amount = 0;
-  let phoneNumber = "";
-
-  if (metadata?.Item) {
-    const refItem = metadata.Item.find((item: any) => item.Name === "AccountReference");
-    const receiptItem = metadata.Item.find((item: any) => item.Name === "MpesaReceiptNumber");
-    const amountItem = metadata.Item.find((item: any) => item.Name === "Amount");
-    const phoneItem = metadata.Item.find((item: any) => item.Name === "PhoneNumber");
-
-    bookingId = Number(refItem?.Value || 0);
-    mpesaReceipt = receiptItem?.Value || "";
-    amount = Number(amountItem?.Value || 0);
-    phoneNumber = phoneItem?.Value || "";
+  /**
+   * Generate password for STK push
+   */
+  private generatePassword(): { password: string; timestamp: string } {
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, -3);
+    const password = Buffer.from(`${this.businessShortCode}${this.passkey}${timestamp}`).toString('base64');
+    
+    return { password, timestamp };
   }
 
-  if (!bookingId) {
-    console.error("❌ Missing booking ID in callback metadata");
-    throw new Error("Missing booking ID");
+  /**
+   * Format phone number to international format
+   */
+  private formatPhoneNumber(phoneNumber: string): string {
+    // Remove any non-digit characters
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // Handle Kenyan numbers
+    if (cleaned.startsWith('254')) {
+      return cleaned;
+    } else if (cleaned.startsWith('0')) {
+      return '254' + cleaned.slice(1);
+    } else if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
+      return '254' + cleaned;
+    }
+    
+    return cleaned;
   }
 
-  if (resultCode === 0) {
-    await createPayment({
-      bookingId,
-      amount,
-      phoneNumber,
-      paymentMethod: "mpesa",
-      paymentStatus: "completed",
-      transactionId: mpesaReceipt,
-      paymentDate: new Date(),
-    });
-    return { success: true, status: "completed", bookingId, receipt: mpesaReceipt };
-  } else {
-    return { success: false, status: "failed", bookingId, message: resultDesc };
+  /**
+   * Initiate STK Push payment
+   */
+  async initiateSTKPush(bookingId: number, phoneNumber: string, amount: number): Promise<{
+    success: boolean;
+    message: string;
+    data?: STKPushResponse;
+  }> {
+    try {
+      // Get booking details
+      const booking = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+      
+      if (!booking.length) {
+        return {
+          success: false,
+          message: 'Booking not found'
+        };
+      }
+
+      const accessToken = await this.getAccessToken();
+      const { password, timestamp } = this.generatePassword();
+      const formattedPhone = this.formatPhoneNumber(phoneNumber);
+
+      const stkPushData: STKPushRequest = {
+        BusinessShortCode: this.businessShortCode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: 'CustomerPayBillOnline',
+        Amount: Math.round(amount), // M-Pesa requires integer amounts
+        PartyA: formattedPhone,
+        PartyB: this.businessShortCode,
+        PhoneNumber: formattedPhone,
+        CallBackURL: this.callbackUrl,
+        AccountReference: booking[0].bookingReference,
+        TransactionDesc: `Payment for booking ${booking[0].bookingReference}`,
+      };
+
+      const response = await axios.post<STKPushResponse>(
+        `${this.baseUrl}/mpesa/stkpush/v1/processrequest`,
+        stkPushData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.ResponseCode === '0') {
+        // Store M-Pesa request in database
+        await db.insert(mpesaRequests).values({
+          bookingId,
+          merchantRequestId: response.data.MerchantRequestID,
+          checkoutRequestId: response.data.CheckoutRequestID,
+          status: 'pending',
+        });
+
+        // Create payment record
+        await db.insert(payments).values({
+          bookingId,
+          amount: amount.toString(),
+          paymentMethod: 'mpesa',
+          phoneNumber: formattedPhone,
+          paymentStatus: 'pending',
+        });
+
+        return {
+          success: true,
+          message: response.data.CustomerMessage,
+          data: response.data,
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data.ResponseDescription || 'STK push failed',
+        };
+      }
+    } catch (error) {
+      console.error('STK Push error:', error);
+      return {
+        success: false,
+        message: 'Failed to initiate payment. Please try again.',
+      };
+    }
   }
-};
 
-export const getPaymentStats = async () => {
-  const stats = await db.select().from(payments);
-  const totalPayments = stats.length;
-  const completedPayments = stats.filter(p => p.paymentStatus === "completed").length;
-  const failedPayments = stats.filter(p => p.paymentStatus === "failed").length;
-  const pendingPayments = stats.filter(p => p.paymentStatus === "pending").length;
-  const totalAmount = stats
-    .filter(p => p.paymentStatus === "completed")
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  /**
+   * Handle M-Pesa callback
+   */
+  async handleCallback(callbackData: CallbackRequest): Promise<void> {
+    try {
+      const { stkCallback } = callbackData.Body;
+      const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc } = stkCallback;
 
-  return {
-    totalPayments,
-    completedPayments,
-    failedPayments,
-    pendingPayments,
-    totalAmount: totalAmount.toFixed(2),
-    successRate: totalPayments > 0 ? ((completedPayments / totalPayments) * 100).toFixed(1) : "0",
-  };
-};
+      // Find the M-Pesa request
+      const mpesaRequest = await db
+        .select()
+        .from(mpesaRequests)
+        .where(eq(mpesaRequests.merchantRequestId, MerchantRequestID))
+        .limit(1);
 
-export const isPaymentCompleted = async (bookingId: number): Promise<boolean> => {
-  const payment = await getPaymentByBookingId(bookingId);
-  return payment?.paymentStatus === "completed";
-};
+      if (!mpesaRequest.length) {
+        console.error('M-Pesa request not found:', MerchantRequestID);
+        return;
+      }
 
-export const getRecentPayments = async (limit: number = 10) => {
-  return db.select().from(payments).orderBy(desc(payments.createdAt)).limit(limit);
-};
+      const request = mpesaRequest[0];
+
+      if (ResultCode === 0) {
+        // Payment successful
+        let transactionId = '';
+        let paidAmount = 0;
+
+        if (stkCallback.CallbackMetadata?.Item) {
+          for (const item of stkCallback.CallbackMetadata.Item) {
+            if (item.Name === 'MpesaReceiptNumber') {
+              transactionId = item.Value as string;
+            }
+            if (item.Name === 'Amount') {
+              paidAmount = item.Value as number;
+            }
+          }
+        }
+
+        // Update M-Pesa request status
+        await db
+          .update(mpesaRequests)
+          .set({ status: 'completed' })
+          .where(eq(mpesaRequests.id, request.id));
+
+        // Update payment record
+        await db
+          .update(payments)
+          .set({
+            paymentStatus: 'completed',
+            transactionId,
+            paymentDate: new Date(),
+          })
+          .where(eq(payments.bookingId, request.bookingId));
+
+        // Update booking status to confirmed
+        await db
+          .update(bookings)
+          .set({ status: 'confirmed' })
+          .where(eq(bookings.id, request.bookingId));
+
+        console.log(`Payment successful for booking ${request.bookingId}:`, transactionId);
+      } else {
+        // Payment failed
+        await db
+          .update(mpesaRequests)
+          .set({ status: 'failed' })
+          .where(eq(mpesaRequests.id, request.id));
+
+        await db
+          .update(payments)
+          .set({ paymentStatus: 'failed' })
+          .where(eq(payments.bookingId, request.bookingId));
+
+        console.log(`Payment failed for booking ${request.bookingId}:`, ResultDesc);
+      }
+    } catch (error) {
+      console.error('Error handling M-Pesa callback:', error);
+    }
+  }
+
+  /**
+   * Query STK Push status
+   */
+  async querySTKPushStatus(checkoutRequestId: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: any;
+  }> {
+    try {
+      const accessToken = await this.getAccessToken();
+      const { password, timestamp } = this.generatePassword();
+
+      const queryData = {
+        BusinessShortCode: this.businessShortCode,
+        Password: password,
+        Timestamp: timestamp,
+        CheckoutRequestID: checkoutRequestId,
+      };
+
+      const response = await axios.post(
+        `${this.baseUrl}/mpesa/stkpushquery/v1/query`,
+        queryData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        success: true,
+        message: 'Query successful',
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('STK Push query error:', error);
+      return {
+        success: false,
+        message: 'Failed to query payment status',
+      };
+    }
+  }
+}
