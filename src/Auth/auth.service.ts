@@ -8,7 +8,7 @@ type SignupInput = {
   email: string;
   password: string;
   name?: string;
-  role?: 'admin' | 'staff' | 'customer';
+  role?: 'admin' | 'customer' | 'customer';
 };
 
 type LoginInput = {

@@ -139,3 +139,54 @@ MPESA_CALLBACK_URL=https://f672db3aa218.ngrok-free.app/payments/mpesa/callback
 
 # Environment: sandbox or production
 MPESA_ENVIRONMENT=sandbox
+
+
+
+
+
+http://localhost:3000/payments/initiate/2
+
+
+
+[
+  {
+    "name": "Toyota Corolla",
+    "category": "Sedan",
+    "pricePerDay": 3500,
+    "fuelType": "Petrol",
+    "seats": 5,
+    "transmission": "Automatic",
+    "imageUrl": "https://images.unsplash.com/photo-1626072557464-90403d788e8d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjB8fHRveW90YXxlbnwwfHwwfHx8MA%3D%3D",
+    "location": "Nairobi"
+  },
+  {
+    "name": "Toyota Land Cruiser",
+    "category": "SUV",
+    "pricePerDay": 9500,
+    "fuelType": "Diesel",
+    "seats": 7,
+    "transmission": "Automatic",
+    "imageUrl": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjR8fHRveW90YXxlbnwwfHwwfHx8MA%3D%3D",
+    "location": "Mombasa"
+  },
+  {
+    "name": "Mazda Demio",
+    "category": "Hatchback",
+    "pricePerDay": 2500,
+    "fuelType": "Petrol",
+    "seats": 5,
+    "transmission": "Manual",
+    "imageUrl": "https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=464&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "location": "Kisumu"
+  },
+  {
+    "name": "Mercedes-Benz C-Class",
+    "category": "Luxury",
+    "pricePerDay": 12000,
+    "fuelType": "Petrol",
+    "seats": 5,
+    "transmission": "Automatic",
+    "imageUrl": "https://images.unsplash.com/photo-1656764123166-8c5ae4869718?q=80&w=327&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    "location": "Nakuru"
+  }
+]
