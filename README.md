@@ -91,16 +91,15 @@ car
 
 // bookings
 
-    {
-    "id": 1,
-    "bookingId": 1,
-    "amount": 13500.00,
-    "paymentMethod": "mpesa",
-    "phoneNumber": "254712345678",
-    "paymentStatus": "pending",
-    "transactionId": "MPESA123456789",
-    "paymentDate": "2025-07-22T19:30:00.000Z"
-  }
+{
+  "userId": 4,
+  "carId": 1,
+  "pickupDate": "2025-07-25T10:00:00.000Z",
+  "returnDate": "2025-07-27T10:00:00.000Z",
+  "pickupLocation": "Nairobi CBD",
+  "totalAmount": 7500,
+  "bookingReference": "QR-AB1234"
+}
 
   // payments
 
