@@ -32,9 +32,10 @@ app.use(
   cors({
     origin: (origin) => {
       // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return true;
+      if (!origin) return origin;
       
-      return allowedOrigins.includes(origin);
+      // Return the origin if it's allowed, otherwise return null
+      return allowedOrigins.includes(origin) ? origin : null;
     },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
