@@ -19,27 +19,18 @@ const app = new Hono();
 // ✅ Log all requests with method, path, and response status
 app.use('*', logger());
 
-// ✅ Determine allowed origins based on environment
-const allowedOrigins = [
-  'http://localhost:5173',  // Development frontend
-  'http://localhost:3000',  // Alternative dev port
-  'https://quickride-frontend-ojoo.vercel.app'  // Production frontend
-];
-
-// ✅ Enable CORS for both development and production
+// ✅ Enable CORS - Simple and clean configuration
 app.use(
   '*',
   cors({
-    origin: (origin) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return origin;
-      
-      // Return the origin if it's allowed, otherwise return null
-      return allowedOrigins.includes(origin) ? origin : null;
-    },
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://quickride-frontend-ojoo.vercel.app'
+    ],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
-    credentials: true, // 👈 allow cookies/sessions or credentials
+    credentials: true,
   })
 );
 
@@ -63,6 +54,10 @@ serve(
   },
   (info) => {
     console.log(`✅ Server running at: http://localhost:${info.port}`);
-    console.log(`🌐 Allowed CORS origins:`, allowedOrigins);
+    console.log(`🌐 CORS enabled for:`, [
+      'http://localhost:5173',
+      'http://localhost:3000', 
+      'https://quickride-frontend-ojoo.vercel.app'
+    ]);
   }
 );
