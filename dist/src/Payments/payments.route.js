@@ -35,7 +35,7 @@ mpesa.get('/history/:bookingId', mpesaController.getPaymentHistory);
  * @access  Public
  * @query   ?page=1&limit=10
  */
-mpesa.get('/payments', mpesaController.getAllPayments);
+mpesa.get('/', mpesaController.getAllPayments);
 /**
  * @route   POST /mpesa/retry/:bookingId
  * @desc    Retry failed payment for a booking
