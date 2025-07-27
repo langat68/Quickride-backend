@@ -3,8 +3,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node ./dist/index.js"
+    "build": "echo 'No build step needed with tsx'",
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.17.1",
@@ -20,7 +20,8 @@
     "nanoid": "^5.1.5",
     "nodemailer": "^7.0.5",
     "pg": "^8.16.3",
-    "zod": "^4.0.5"
+    "zod": "^4.0.5",
+    "tsx": "^4.20.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -30,7 +31,6 @@
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.15.4",
     "drizzle-kit": "^0.31.4",
-    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }
