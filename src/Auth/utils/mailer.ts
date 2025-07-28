@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer'
-import type { SentMessageInfo } from 'nodemailer'
+import nodemailer from 'nodemailer';
+import type { SentMessageInfo } from 'nodemailer';
 
 export const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -7,9 +7,9 @@ export const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-})
+});
 
-// sending a message to the users email
+// sending a welcome message to the user's email
 export const sendWelcomeEmail = async (
   to: string,
   name: string

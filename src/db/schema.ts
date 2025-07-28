@@ -28,12 +28,13 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 ]);
 
 //
-// 🔹 Users Table
+// 🔹 Users Table (Updated for Google OAuth)
 //
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).unique().notNull(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"), // ✅ Made nullable for Google users
+  googleId: varchar("google_id", { length: 255 }), // ✅ Added for Google OAuth
   role: userRole("role").default("customer").notNull(),
   name: varchar("name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
