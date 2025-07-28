@@ -9,6 +9,11 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+// ✅ NEW: Google OAuth login schema
+export const googleLoginSchema = z.object({
+  googleToken: z.string().min(1, "Google token is required"),
+});
+
 export const registerSchema = z
   .object({
     name: z.string().min(2).optional(),
@@ -89,8 +94,6 @@ export const carIdParam = z.object({
 // Booking Validators
 // =======================
 
-
-
 export const createBookingSchema = z.object({
   userId: z.coerce.number().positive(),
   carId: z.coerce.number().positive(),
@@ -109,7 +112,6 @@ export const bookingIdParam = z.object({
 });
 
 // =======================
-
 // Payment Validators
 // =======================
 export const createPaymentSchema = z.object({
@@ -122,15 +124,11 @@ export const createPaymentSchema = z.object({
   paymentDate: z.coerce.date().optional(),
 });
 
-
 export const updatePaymentSchema = createPaymentSchema.partial();
 
 export const paymentIdParam = z.object({
   id: z.coerce.number().positive(),
 });
-
-
-
 
 export const initiateMpesaSchema = z.object({
   phoneNumber: z.string().min(10).max(15),
